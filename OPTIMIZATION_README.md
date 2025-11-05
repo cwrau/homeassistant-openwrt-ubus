@@ -39,7 +39,6 @@ _update_intervals = {
     "system_board": timedelta(minutes=5),    # 硬件信息
     "qmodem_info": timedelta(minutes=1),     # QModem信息
     "device_statistics": timedelta(seconds=30), # 设备统计
-    "dhcp_leases": timedelta(seconds=30),    # DHCP租约
     "hostapd_clients": timedelta(seconds=30), # Hostapd客户端
     "iwinfo_stations": timedelta(seconds=30), # Iwinfo站点
 }
@@ -98,9 +97,9 @@ coordinator = SharedDataUpdateCoordinator(
 system_data = await data_manager.get_data("system_info")
 
 # 获取多种类型数据
-combined_data = await data_manager.get_combined_data([
-    "system_info", 
-    "system_board", 
+combined_data = await data_manager.update_data([
+    "system_info",
+    "system_board",
     "qmodem_info"
 ])
 ```

@@ -18,8 +18,8 @@
         "data": {
           "enable_system_sensors": "Enable System Sensors",
           "enable_qmodem_sensors": "Enable QModem Sensors",
-          "enable_sta_sensors": "Enable Station (WiFi Device) Sensors",
-          "enable_ap_sensors": "Enable Access Point Sensors",
+          "enable_station_sensors": "Enable Station (WiFi Device) Sensors",
+          "enable_access_point_sensors": "Enable Access Point Sensors",
           "enable_service_controls": "Enable Service Controls",
           "enable_device_kick_buttons": "Enable Device Kick Buttons (requires hostapd)"
         }
@@ -31,13 +31,13 @@
           "selected_services": "Services to Control"
         }
       },
-      "timeouts": {
-        "title": "OpenWrt ubus - Timeout Configuration",
+      "intervals": {
+        "title": "OpenWrt ubus - Interval Configuration",
         "description": "Configure update intervals for sensors on {host}",
         "data": {
-          "system_sensor_timeout": "System Sensor Update Interval (seconds)",
-          "qmodem_sensor_timeout": "QModem Sensor Update Interval (seconds)",
-          "sta_sensor_timeout": "Station Sensor Update Interval (seconds)"
+          "system_sensor_interval": "System Sensor Update Interval (seconds)",
+          "qmodem_sensor_interval": "QModem Sensor Update Interval (seconds)",
+          "station_sensor_interval": "Station Sensor Update Interval (seconds)"
         }
       }
     },
@@ -56,16 +56,16 @@
     "step": {
       "init": {
         "title": "OpenWrt ubus Configuration",
-        "description": "Configure sensors, timeouts and software settings for {host}",
+        "description": "Configure sensors, intervals and software settings for {host}",
         "data": {
           "wireless_software": "Wireless Software",
           "dhcp_software": "DHCP Software",
           "enable_system_sensors": "Enable System Sensors",
           "enable_qmodem_sensors": "Enable QModem Sensors",
-          "enable_sta_sensors": "Enable Station (WiFi Device) Sensors",
-          "system_sensor_timeout": "System Sensor Update Interval (seconds)",
-          "qmodem_sensor_timeout": "QModem Sensor Update Interval (seconds)",
-          "sta_sensor_timeout": "Station Sensor Update Interval (seconds)"
+          "enable_station_sensors": "Enable Station (WiFi Device) Sensors",
+          "system_sensor_interval": "System Sensor Update Interval (seconds)",
+          "qmodem_sensor_interval": "QModem Sensor Update Interval (seconds)",
+          "sta_sensor_interval": "Station Sensor Update Interval (seconds)"
         }
       },
       "sensors": {
@@ -74,18 +74,18 @@
         "data": {
           "enable_system_sensors": "Enable System Sensors",
           "enable_qmodem_sensors": "Enable QModem Sensors",
-          "enable_sta_sensors": "Enable Station (WiFi Device) Sensors",
+          "enable_station_sensors": "Enable Station (WiFi Device) Sensors",
           "wireless_software": "Wireless Software",
           "dhcp_software": "DHCP Software"
         }
       },
-      "timeouts": {
-        "title": "Timeout Configuration",
+      "intervals": {
+        "title": "Interval Configuration",
         "description": "Configure update intervals for sensors on {host}",
         "data": {
-          "system_sensor_timeout": "System Sensor Update Interval (seconds)",
-          "qmodem_sensor_timeout": "QModem Sensor Update Interval (seconds)",
-          "sta_sensor_timeout": "Station Sensor Update Interval (seconds)"
+          "system_sensor_interval": "System Sensor Update Interval (seconds)",
+          "qmodem_sensor_interval": "QModem Sensor Update Interval (seconds)",
+          "sta_sensor_interval": "Station Sensor Update Interval (seconds)"
         }
       }
     }

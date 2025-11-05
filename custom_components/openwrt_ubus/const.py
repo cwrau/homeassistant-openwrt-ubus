@@ -6,6 +6,7 @@ DOMAIN = "openwrt_ubus"
 PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
 # Configuration constants
+CONF_SECTION_KEY = "conf"
 CONF_DHCP_SOFTWARE = "dhcp_software"
 CONF_WIRELESS_SOFTWARE = "wireless_software"
 DEFAULT_DHCP_SOFTWARE = "dnsmasq"
@@ -15,20 +16,20 @@ WIRELESS_SOFTWARES = ["hostapd", "iwinfo", "none"]
 
 # Sensor enable/disable configuration
 CONF_ENABLE_QMODEM_SENSORS = "enable_qmodem_sensors"
-CONF_ENABLE_STA_SENSORS = "enable_sta_sensors"
+CONF_ENABLE_STATION_SENSORS = "enable_station_sensors"
 CONF_ENABLE_SYSTEM_SENSORS = "enable_system_sensors"
-CONF_ENABLE_AP_SENSORS = "enable_ap_sensors"
+CONF_ENABLE_ACCESS_POINT_SENSORS = "enable_access_point_sensors"
 CONF_ENABLE_SERVICE_CONTROLS = "enable_service_controls"
 
 CONF_ENABLE_DEVICE_KICK_BUTTONS = "enable_device_kick_buttons"
 CONF_SELECTED_SERVICES = "selected_services"
 
-# Timeout configuration
-CONF_SYSTEM_SENSOR_TIMEOUT = "system_sensor_timeout"
-CONF_QMODEM_SENSOR_TIMEOUT = "qmodem_sensor_timeout"
-CONF_STA_SENSOR_TIMEOUT = "sta_sensor_timeout"
-CONF_AP_SENSOR_TIMEOUT = "ap_sensor_timeout"
-CONF_SERVICE_TIMEOUT = "service_timeout"
+# Interval configuration
+CONF_SYSTEM_SENSOR_INTERVAL = "system_sensor_interval"
+CONF_QMODEM_SENSOR_INTERVAL = "qmodem_sensor_interval"
+CONF_STATION_SENSOR_INTERVAL = "station_sensor_interval"
+CONF_ACCESS_POINT_SENSOR_INTERVAL = "access_point_sensor_interval"
+CONF_SERVICE_INTERVAL = "service_interval"
 
 # Default values
 DEFAULT_ENABLE_QMODEM_SENSORS = True
@@ -39,11 +40,11 @@ DEFAULT_ENABLE_SERVICE_CONTROLS = False
 
 DEFAULT_ENABLE_DEVICE_KICK_BUTTONS = False
 DEFAULT_SELECTED_SERVICES = []
-DEFAULT_SYSTEM_SENSOR_TIMEOUT = 30
-DEFAULT_QMODEM_SENSOR_TIMEOUT = 120
-DEFAULT_STA_SENSOR_TIMEOUT = 30
-DEFAULT_AP_SENSOR_TIMEOUT = 60
-DEFAULT_SERVICE_TIMEOUT = 30
+DEFAULT_SYSTEM_SENSOR_INTERVAL = 30
+DEFAULT_QMODEM_SENSOR_INTERVAL = 120
+DEFAULT_STATISTIC_SENSOR_INTERVAL = 30
+DEFAULT_ACCESS_POINT_SENSOR_INTERVAL = 60
+DEFAULT_SERVICE_INTERVAL = 30
 
 # API constants - moved from Ubus/const.py
 API_RPC_CALL = "call"

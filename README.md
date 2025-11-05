@@ -176,9 +176,9 @@ EOF
 | 🔑 **Password** | Login password | - | Router admin password |
 | 📡 **Wireless Software** | Wireless monitoring method | iwinfo | iwinfo, hostapd, none |
 | 🌐 **DHCP Software** | DHCP client detection | dnsmasq | dnsmasq, odhcpd, none |
-| ⏱️ **System Timeout** | System data fetch timeout | 30s | 5s-300s |
-| 📊 **QModem Timeout** | QModem data fetch timeout | 30s | 5s-300s |
-| ⚙️ **Service Timeout** | Service control timeout | 30s | 5s-300s |
+| ⏱️ **System Interval** | System data fetch interval | 30s | 5s-300s |
+| 📊 **QModem Interval** | QModem data fetch interval | 30s | 5s-300s |
+| ⚙️ **Service Interval** | Service control interval | 30s | 5s-300s |
 | 🚫 **Device Kick Buttons** | Enable device kick functionality | Disabled | Enabled/Disabled |
 
 ---
@@ -390,14 +390,14 @@ Device kick functionality is disabled by default for security. To enable:
 
 ### 🔧 Advanced Configuration & Optimization
 
-#### Timeout Settings
+#### Interval Settings
 Fine-tune integration performance based on your network and router capabilities:
 
-- **System Sensor Timeout**: How long to wait for system data collection (5-300 seconds)
+- **System Sensor Interval**: How long to wait for system data collection (5-300 seconds)
   - *Recommended*: 30s for most routers, 60s for older hardware
-- **QModem Timeout**: Timeout for LTE/4G/5G modem queries (5-300 seconds)  
+- **QModem Interval**: Interval for LTE/4G/5G modem queries (5-300 seconds)  
   - *Recommended*: 30s for stable connections, 120s for weak signal areas
-- **Service Timeout**: Timeout for service control operations (5-300 seconds)
+- **Service Interval**: Interval for service control operations (5-300 seconds)
   - *Recommended*: 30s for local operations, 60s for complex service chains
 
 #### Performance Optimization Features
@@ -426,7 +426,7 @@ Fine-tune integration performance based on your network and router capabilities:
 - ✅ Confirm username and password credentials are valid
 - ✅ Ensure `rpcd` and `uhttpd` services are running: `service rpcd status && service uhttpd status`
 - ✅ Check firewall settings allow HTTP access to ubus (port 80/443)
-- ✅ Test connectivity: `curl http://router_ip/ubus -d '{"jsonrpc":"2.0","method":"call","params":["00000000000000000000000000000000","session","login",{"username":"root","password":"your_password"}],"id":1}'`
+- ✅ Test connectivity: `curl https://router_ip/ubus -d '{"jsonrpc":"2.0","method":"call","params":["00000000000000000000000000000000","session","login",{"username":"root","password":"your_password"}],"id":1}'`
 
 **❌ No Devices Detected**
 - ✅ Verify wireless software setting matches your OpenWrt configuration
@@ -440,7 +440,7 @@ Fine-tune integration performance based on your network and router capabilities:
 - ✅ Verify router permissions allow access to system information
 - ✅ Test system data access: `ubus call system info && ubus call system board`
 - ✅ Check network connectivity stability between Home Assistant and router
-- ✅ Review timeout settings in integration configuration
+- ✅ Review interval settings in integration configuration
 
 **🏷️ Devices Show MAC Addresses Instead of Hostnames**
 - ✅ Ensure hostname resolution ACL is properly configured (see [Router Permissions Setup](#router-permissions-setup-🔐))
@@ -472,7 +472,7 @@ logger:
 ```
 
 **Log Analysis Tips:**
-- **Connection Issues**: Look for "Failed to connect" or "Timeout" messages
+- **Connection Issues**: Look for "Failed to connect" or "Interval" messages
 - **Authentication Problems**: Search for "401" or "authentication failed" errors
 - **Device Detection**: Check for "No devices found" or parsing errors
 - **Service Control**: Monitor "Service operation failed" messages

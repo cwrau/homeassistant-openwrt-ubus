@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
-import re
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -30,15 +29,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
-    UpdateFailed,
 )
 
 from ..const import (
     DOMAIN,
-    CONF_SYSTEM_SENSOR_TIMEOUT,
-    DEFAULT_SYSTEM_SENSOR_TIMEOUT,
+    CONF_SYSTEM_SENSOR_INTERVAL,
+    DEFAULT_SYSTEM_SENSOR_INTERVAL,
 )
-from ..shared_data_manager import SharedDataUpdateCoordinator
+from ..shared_data_manager import SharedDataUpdateCoordinator, SYSTEM_INFO, SYSTEM_BOARD, CONNTRACK_COUNT, \
+    SYSTEM_TEMPERATURES, DHCP_CLIENTS_COUNT, SharedUbusDataManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -200,28 +199,27 @@ SENSOR_DESCRIPTIONS = [
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        async_add_entities: AddEntitiesCallback,
 ) -> SharedDataUpdateCoordinator:
     """Set up OpenWrt system sensors from a config entry."""
-    
+
     # Get shared data manager
-    data_manager_key = f"data_manager_{entry.entry_id}"
-    data_manager = hass.data[DOMAIN][data_manager_key]
-    
-    # Get timeout from configuration (priority: options > data > default)
-    timeout = entry.options.get(
-        CONF_SYSTEM_SENSOR_TIMEOUT,
-        entry.data.get(CONF_SYSTEM_SENSOR_TIMEOUT, DEFAULT_SYSTEM_SENSOR_TIMEOUT)
+    data_manager: SharedUbusDataManager = hass.data[DOMAIN][f"data_manager_{entry.entry_id}"]
+
+    # Get interval from configuration (priority: options > data > default)
+    interval = entry.options.get(
+        CONF_SYSTEM_SENSOR_INTERVAL,
+        entry.data.get(CONF_SYSTEM_SENSOR_INTERVAL, DEFAULT_SYSTEM_SENSOR_INTERVAL)
     )
-    scan_interval = timedelta(seconds=timeout)
-    
+    scan_interval = timedelta(seconds=interval)
+
     # Create coordinator using shared data manager
     coordinator = SharedDataUpdateCoordinator(
         hass,
         data_manager,
-        ["system_info", "system_board", "conntrack_count", "system_temperatures", "dhcp_clients_count"],  # Data types this coordinator needs
+        SYSTEM_INFO | SYSTEM_BOARD | CONNTRACK_COUNT | SYSTEM_TEMPERATURES | DHCP_CLIENTS_COUNT,
         f"{DOMAIN}_system_{entry.data[CONF_HOST]}",
         scan_interval,
     )
@@ -233,7 +231,7 @@ async def async_setup_entry(
         SystemInfoSensor(coordinator, description)
         for description in SENSOR_DESCRIPTIONS
     ]
-    
+
     # Add temperature sensors dynamically based on available sensors
     if coordinator.data and "system_temperatures" in coordinator.data:
         temperatures = coordinator.data["system_temperatures"]
@@ -253,6 +251,7 @@ async def async_setup_entry(
 
     return coordinator
 
+
 class SystemInfoCoordinator(DataUpdateCoordinator):
     """Class to manage fetching system information from the router."""
 
@@ -268,13 +267,14 @@ class SystemInfoCoordinator(DataUpdateCoordinator):
 
         self.url = f"http://{self.host}/ubus"
 
+
 class SystemInfoSensor(CoordinatorEntity, SensorEntity):
     """Representation of a system information sensor."""
 
     def __init__(
-        self,
-        coordinator: SharedDataUpdateCoordinator,
-        description: SensorEntityDescription,
+            self,
+            coordinator: SharedDataUpdateCoordinator,
+            description: SensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -287,8 +287,10 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
     def device_info(self) -> DeviceInfo:
         """Return device info for the router."""
         # Try to get board info from coordinator data
-        board_model = self.coordinator.data.get("system_board", {}).get("model", "Router") if self.coordinator.data else "Router"
-        board_hostname = self.coordinator.data.get("system_board", {}).get("hostname") if self.coordinator.data else None
+        board_model = self.coordinator.data.get("system_board", {}).get("model",
+                                                                        "Router") if self.coordinator.data else "Router"
+        board_hostname = self.coordinator.data.get("system_board", {}).get(
+            "hostname") if self.coordinator.data else None
         board_system = self.coordinator.data.get("system_board", {}).get("system") if self.coordinator.data else None
 
         # Use hostname for name if available, otherwise use host
@@ -314,11 +316,11 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
     def _get_sensor_value(self) -> Any:
         """Get the sensor value from coordinator data."""
         key = self.entity_description.key
-        
+
         # Handle system info data
         system_info = self.coordinator.data.get("system_info", {})
         board_info = self.coordinator.data.get("system_board", {})
-        
+
         # Map sensor keys to their data sources
         if key == "uptime":
             return system_info.get("uptime")
@@ -369,7 +371,7 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
             root = self.coordinator.data.get("system_info", {}).get("root", {})
             free = root.get("free")
             return round(free / 1024, 2) if free is not None else None
-        
+
         return None
 
     @property
@@ -382,7 +384,7 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
         """Return additional state attributes."""
         attributes = {
             "router_host": self._host,
-            "last_update": self.coordinator.last_update_success,
+            "last_update_success": self.coordinator.last_update_success,
         }
 
         # Add raw system info for debugging if available

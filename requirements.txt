@@ -1,0 +1,5 @@
+aiohttp
+pytest~=8.4.2
+pytest-asyncio~=1.2.0
+homeassistant~=2025.10.2
+voluptuous~=0.15.2

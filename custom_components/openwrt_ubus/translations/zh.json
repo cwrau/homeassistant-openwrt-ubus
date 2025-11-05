@@ -12,6 +12,13 @@
           "dhcp_software": "DHCP 软件"
         }
       },
+      "services": {
+        "title": "OpenWrt ubus - 服务选择",
+        "description": "选择要控制的 {host} 服务（发现 {services_count} 个服务）",
+        "data": {
+          "selected_services": "要控制的服务"
+        }
+      },
       "sensors": {
         "title": "OpenWrt ubus - 传感器配置",
         "description": "选择要为 {host} 启用的传感器类型",
@@ -24,22 +31,15 @@
           "enable_device_kick_buttons": "启用设备踢出按钮（需要hostapd）"
         }
       },
-      "services": {
-        "title": "OpenWrt ubus - 服务选择",
-        "description": "选择要控制的 {host} 服务（发现 {services_count} 个服务）",
-        "data": {
-          "selected_services": "要控制的服务"
-        }
-      },
-      "timeouts": {
+      "intervals": {
         "title": "OpenWrt ubus - 超时配置",
         "description": "配置 {host} 上传感器的更新间隔",
         "data": {
-          "system_sensor_timeout": "系统传感器更新间隔（秒）",
-          "qmodem_sensor_timeout": "调制解调器传感器更新间隔（秒）",
-          "sta_sensor_timeout": "站点传感器更新间隔（秒）",
-          "ap_sensor_timeout": "接入点传感器更新间隔（秒）",
-          "service_timeout": "服务状态更新间隔（秒）"
+          "system_sensor_interval": "系统传感器更新间隔（秒）",
+          "qmodem_sensor_interval": "调制解调器传感器更新间隔（秒）",
+          "sta_sensor_interval": "站点传感器更新间隔（秒）",
+          "ap_sensor_interval": "接入点传感器更新间隔（秒）",
+          "service_interval": "服务状态更新间隔（秒）"
         }
       }
     },
@@ -69,10 +69,10 @@
           "enable_service_controls": "启用服务控制",
           "selected_services": "要控制的服务",
           "refresh_services": "刷新服务列表",
-          "system_sensor_timeout": "系统传感器更新间隔（秒）",
-          "qmodem_sensor_timeout": "调制解调器传感器更新间隔（秒）",
-          "sta_sensor_timeout": "站点传感器更新间隔（秒）",
-          "ap_sensor_timeout": "接入点传感器更新间隔（秒）"
+          "system_sensor_interval": "系统传感器更新间隔（秒）",
+          "qmodem_sensor_interval": "调制解调器传感器更新间隔（秒）",
+          "sta_sensor_interval": "站点传感器更新间隔（秒）",
+          "ap_sensor_interval": "接入点传感器更新间隔（秒）"
         }
       },
       "sensors": {
@@ -87,14 +87,14 @@
           "dhcp_software": "DHCP 软件"
         }
       },
-      "timeouts": {
+      "intervals": {
         "title": "超时配置",
         "description": "配置 {host} 上传感器的更新间隔",
         "data": {
-          "system_sensor_timeout": "系统传感器更新间隔（秒）",
-          "qmodem_sensor_timeout": "调制解调器传感器更新间隔（秒）",
-          "sta_sensor_timeout": "站点传感器更新间隔（秒）",
-          "ap_sensor_timeout": "接入点传感器更新间隔（秒）"
+          "system_sensor_interval": "系统传感器更新间隔（秒）",
+          "qmodem_sensor_interval": "调制解调器传感器更新间隔（秒）",
+          "sta_sensor_interval": "站点传感器更新间隔（秒）",
+          "ap_sensor_interval": "接入点传感器更新间隔（秒）"
         }
       },
       "services": {

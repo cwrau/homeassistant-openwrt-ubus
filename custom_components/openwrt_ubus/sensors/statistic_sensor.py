@@ -1,12 +1,12 @@
-
 """Support for OpenWrt router device statistics sensors."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import timedelta
 import logging
 import time
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Callable
 
 from homeassistant.components.sensor import (
@@ -23,19 +23,21 @@ from homeassistant.const import (
     UnitOfDataRate
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from .. import SharedUbusDataManager
 from ..const import (
     DOMAIN,
-    CONF_STA_SENSOR_TIMEOUT,
-    DEFAULT_STA_SENSOR_TIMEOUT,
+    CONF_STATION_SENSOR_INTERVAL,
+    DEFAULT_STATISTIC_SENSOR_INTERVAL,
 )
-from ..shared_data_manager import SharedDataUpdateCoordinator
+from ..shared_data_manager import SharedDataUpdateCoordinator, SharedData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,14 +52,14 @@ class SensorValueMapping:
     default_value: Any = None
 
 
-@dataclass  
+@dataclass
 class AttributeMapping:
     """Data class for extra attribute mapping configuration."""
     data_keys: list[str | tuple]
     convert_function: Callable
 
 
-def _get_simple_value(device_data: dict, keys: list[str], sensor_instance=None) -> Any:
+def _get_simple_value(device_data: dict, keys: list[str]) -> Any:
     """Get simple value from device data."""
     for key in keys:
         if key in device_data:
@@ -67,19 +69,20 @@ def _get_simple_value(device_data: dict, keys: list[str], sensor_instance=None) 
 
 def _get_nested_value(ap_data: dict, keys: list[tuple]) -> Any:
     """Get value from nested dictionary using tuple keys for nested access."""
+
     def get_value(data: dict, key_path: tuple) -> Any:
         """Recursively get value from nested dictionary using tuple as path."""
         if not isinstance(data, dict) or not key_path:
             return None
-        
+
         current_key = key_path[0]
         if current_key not in data:
             return None
-        
+
         # If this is the last key in the path, return the value
         if len(key_path) == 1:
             return data.get(current_key)
-        
+
         # Otherwise, recursively navigate deeper
         return get_value(data[current_key], key_path[1:])
 
@@ -114,11 +117,11 @@ def _convert_bytes_to_mb(device_data: dict, keys: list[str], sensor_instance=Non
     return None
 
 
-def _calculate_speed(device_data: dict, keys: list[str], sensor_instance=None) -> float | None:
+def _calculate_speed(device_data: dict, keys: list[tuple], sensor_instance=None) -> float | None:
     """Calculate speed based on bytes."""
     data_bytes = _get_nested_value(device_data, keys)
     rx = False
-    #if key contains rx/tx
+    # if key contains rx/tx
     if data_bytes is None:
         return None
     if keys[0][0].startswith("rx"):
@@ -129,7 +132,7 @@ def _calculate_speed(device_data: dict, keys: list[str], sensor_instance=None) -
         if sensor_instance._previous_update_time is None:
             sensor_instance._previous_update_time = current_time
             if rx:
-                sensor_instance._previous_rx_bytes  = data_bytes
+                sensor_instance._previous_rx_bytes = data_bytes
             else:
                 sensor_instance._previous_tx_bytes = data_bytes
             return None
@@ -147,7 +150,6 @@ def _calculate_speed(device_data: dict, keys: list[str], sensor_instance=None) -
         return speed * 8 / 1024
 
 
-
 def _get_online_status(device_data: dict, keys: list[str], sensor_instance=None) -> bool:
     """Return True if device is online (exists in device_statistics)."""
     return True  # If device_data exists, device is online
@@ -157,7 +159,7 @@ def _has_required_data(device_data: dict, required_keys: list[str]) -> bool:
     """Check if device data contains required keys."""
     if not required_keys:  # For sensors like "online" that don't need specific keys
         return True
-    
+
     for key in required_keys:
         if isinstance(key, tuple) and len(key) >= 2:
             # For nested keys like ("rx", "rate")
@@ -169,7 +171,7 @@ def _has_required_data(device_data: dict, required_keys: list[str]) -> bool:
             # For simple keys
             if key in device_data:
                 return True
-    
+
     return False
 
 
@@ -333,23 +335,23 @@ SENSOR_DESCRIPTIONS = [
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        async_add_entities: AddEntitiesCallback,
 ) -> SharedDataUpdateCoordinator:
     """Set up the device statistics sensors from a config entry."""
-    
+
     # Get shared data manager
     data_manager_key = f"data_manager_{entry.entry_id}"
-    data_manager = hass.data[DOMAIN][data_manager_key]
-    
-    # Get timeout from configuration (priority: options > data > default)
-    timeout = entry.options.get(
-        CONF_STA_SENSOR_TIMEOUT,
-        entry.data.get(CONF_STA_SENSOR_TIMEOUT, DEFAULT_STA_SENSOR_TIMEOUT)
+    data_manager: SharedUbusDataManager = hass.data[DOMAIN][data_manager_key]
+
+    # Get interval from configuration (priority: options > data > default)
+    interval = entry.options.get(
+        CONF_STATION_SENSOR_INTERVAL,
+        entry.data.get(CONF_STATION_SENSOR_INTERVAL, DEFAULT_STATISTIC_SENSOR_INTERVAL)
     )
-    scan_interval = timedelta(seconds=timeout)
-    
+    scan_interval = timedelta(seconds=interval)
+
     # Create coordinator using shared data manager
     coordinator = SharedDataUpdateCoordinator(
         hass,
@@ -358,28 +360,27 @@ async def async_setup_entry(
         f"{DOMAIN}_devices_{entry.data[CONF_HOST]}",
         scan_interval,
     )
-    
+
     # Store known devices for dynamic entity creation
     coordinator.known_devices = set()
     coordinator.async_add_entities = async_add_entities
-    
+
     # Add update listener for dynamic device creation
     async def _handle_coordinator_update_async():
         """Handle coordinator updates and create new entities for new devices."""
         if not coordinator.data or "device_statistics" not in coordinator.data:
             return
-            
+
         device_stats = coordinator.data["device_statistics"]
         current_devices = set(device_stats.keys())
-        
+
         # Handle new devices
-        new_devices = current_devices - coordinator.known_devices
-        if new_devices:
+        if new_devices := current_devices - coordinator.known_devices:
             _LOGGER.info("Found %d new STA devices: %s", len(new_devices), new_devices)
-            
+
             # Get entity registry to check for existing entities
             entity_registry = er.async_get(hass)
-            
+
             new_entities = []
             for mac_address in new_devices:
                 # Check each sensor type for this device
@@ -389,72 +390,46 @@ async def async_setup_entry(
                     existing_entity_id = entity_registry.async_get_entity_id(
                         "sensor", DOMAIN, unique_id
                     )
-                    
+
                     if existing_entity_id:
                         _LOGGER.debug(
                             "STA sensor entity %s already exists with entity_id %s, skipping creation",
                             unique_id, existing_entity_id
                         )
                         continue
-                    
+
                     # Check if sensor has required data
                     device_data = device_stats.get(mac_address, {})
                     mapping = SENSOR_VALUE_MAPPING.get(description.key)
                     if mapping and _has_required_data(device_data, mapping.data_keys):
                         device_sensors_to_add.append(description)
-                
+
                 # Only add sensors that don't already exist and have data
                 if device_sensors_to_add:
                     new_entities.extend([
                         DeviceStatisticsSensor(coordinator, description, mac_address)
                         for description in device_sensors_to_add
                     ])
-                
+
                 coordinator.known_devices.add(mac_address)
-            
+
             # Add new entities only if there are any
             if new_entities:
                 async_add_entities(new_entities, True)
-                _LOGGER.info("Created %d STA sensor entities for %d new devices", 
-                           len(new_entities), len(new_devices))
+                _LOGGER.info("Created %d STA sensor entities for %d new devices",
+                             len(new_entities), len(new_devices))
             else:
-                _LOGGER.debug("No new STA sensor entities to create for %d devices (all already exist or no data)", 
-                            len(new_devices))
-        
-        # Handle removed devices - remove entities for devices that no longer exist
-        removed_devices = coordinator.known_devices - current_devices
-        if removed_devices:
-            _LOGGER.info("Removing %d STA devices: %s", len(removed_devices), removed_devices)
-            entity_registry = er.async_get(hass)
-            
+                _LOGGER.debug("No new STA sensor entities to create for %d devices (all already exist or no data)",
+                              len(new_devices))
+
+        # # Handle removed devices - remove entities for devices that no longer exist
+        if removed_devices := coordinator.known_devices - current_devices:
             for mac_address in removed_devices:
-                for description in SENSOR_DESCRIPTIONS:
-                    unique_id = f"{entry.data[CONF_HOST]}_sensor_{mac_address}_{description.key}"
-                    entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-                    if entity_id:
-                        entity_registry.async_remove(entity_id)
-                        _LOGGER.debug("Removed STA sensor entity %s", entity_id)
-                
                 coordinator.known_devices.discard(mac_address)
-        
-        # Handle entities for existing devices that no longer have required data
-        entity_registry = er.async_get(hass)
-        for mac_address in current_devices & coordinator.known_devices:
-            device_data = device_stats[mac_address]
-            for description in SENSOR_DESCRIPTIONS:
-                unique_id = f"{entry.data[CONF_HOST]}_sensor_{mac_address}_{description.key}"
-                entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-                
-                if entity_id:
-                    # Check if entity should be removed due to missing data
-                    mapping = SENSOR_VALUE_MAPPING.get(description.key)
-                    if mapping and not _has_required_data(device_data, mapping.data_keys):
-                        entity_registry.async_remove(entity_id)
-                        _LOGGER.debug("Removed STA sensor entity %s due to missing data", entity_id)
-    
+
     # Perform first refresh
     await coordinator.async_config_entry_first_refresh()
-    
+
     # Add initial sensors for any devices already discovered
     initial_entities = []
     if coordinator.data and coordinator.data.get("device_statistics"):
@@ -462,7 +437,7 @@ async def async_setup_entry(
         for mac_address in device_stats:
             coordinator.known_devices.add(mac_address)
             device_data = device_stats[mac_address]
-            
+
             # Only add sensors that have the required data
             for description in SENSOR_DESCRIPTIONS:
                 mapping = SENSOR_VALUE_MAPPING.get(description.key)
@@ -470,32 +445,32 @@ async def async_setup_entry(
                     initial_entities.append(
                         DeviceStatisticsSensor(coordinator, description, mac_address)
                     )
-    
+
     # Add initial entities if any
     if initial_entities:
         async_add_entities(initial_entities, True)
         _LOGGER.info("Set up %d initial STA statistics sensors", len(initial_entities))
-    
+
     # Create sync wrapper for async coordinator update handler
     def _handle_coordinator_update():
         """Sync wrapper for async coordinator update handler."""
         hass.async_create_task(_handle_coordinator_update_async())
-    
+
     # Register the update listener
     coordinator.async_add_listener(_handle_coordinator_update)
-    
+
     # Return the coordinator for the main sensor module to track
     return coordinator
 
 
-class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
+class DeviceStatisticsSensor(CoordinatorEntity[SharedDataUpdateCoordinator], SensorEntity):
     """Representation of a device statistics sensor."""
 
     def __init__(
-        self,
-        coordinator: SharedDataUpdateCoordinator,
-        description: SensorEntityDescription,
-        mac_address: str,
+            self,
+            coordinator: SharedDataUpdateCoordinator,
+            description: SensorEntityDescription,
+            mac_address: str,
     ) -> None:
         """Initialize the device statistics sensor."""
         super().__init__(coordinator)
@@ -505,49 +480,72 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         # Use sensor-specific unique ID pattern to avoid collision with device tracker
         self._attr_unique_id = f"{self._host}_sensor_{mac_address}_{description.key}"
         self._attr_has_entity_name = True
-        
+
         # Store previous data for speed calculations
         self._previous_rx_bytes = None
         self._previous_tx_bytes = None
         self._previous_update_time = None
 
+
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info to link this sensor to a device."""
-        # Use the same device identifier as device tracker to link them together
+    def device_info(self) -> DeviceInfo | None:
+        """Return device information for this sensor."""
+        device_stats = self.coordinator.data.get("device_statistics", {})
+        device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+        ap_device = "Unknown AP"
+        if device_data:
+            ap_device = device_data.get("ap_device", "Unknown AP")
         return DeviceInfo(
             identifiers={(DOMAIN, self.mac_address)},
+            name=self._get_device_name(),
             manufacturer="Unknown",
             model="WiFi Device",
             connections={("mac", self.mac_address)},
+            via_device=(DOMAIN, f"{self._host}_ap_{ap_device}"),
         )
+
+    def _get_device_name(self) -> str:
+        """Get the device name from coordinator data or fallback to MAC."""
+        connected_router = self._host or "Unknown Router"
+
+        # Get device statistics from shared coordinator
+        device_stats = self.coordinator.data.get("device_statistics", {})
+        device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+
+        if device_data:
+            hostname = device_data.get("hostname")
+            if hostname and hostname != self.mac_address and hostname != self.mac_address.upper() and hostname != "*":
+                return f"{connected_router} {hostname}"
+
+        # Fallback to MAC address if no device data found
+        return f"{connected_router} {self.mac_address.replace(':', '')}"
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
         if not (
-            self.coordinator.last_update_success
-            and self.coordinator.data is not None
-            and "device_statistics" in self.coordinator.data
-            and self.mac_address in self.coordinator.data["device_statistics"]
+                self.coordinator.last_update_success
+                and self.coordinator.data is not None
+                and "device_statistics" in self.coordinator.data
+                and self.mac_address in self.coordinator.data["device_statistics"]
         ):
             return False
-        
+
         # Check if sensor has the required data to show a value
         device_data = self.coordinator.data["device_statistics"][self.mac_address]
         mapping = SENSOR_VALUE_MAPPING.get(self.entity_description.key)
         if not mapping:
             return False
-        
+
         # Return False if none of the required keys exist
         return _has_required_data(device_data, mapping.data_keys)
 
     @property
-    def native_value(self) -> str | int | float | bool | None:
+    def native_value(self) -> StateType | date | datetime | Decimal:
         """Return the state of the sensor."""
         if not self.coordinator.data or "device_statistics" not in self.coordinator.data:
             return None
-            
+
         device_stats = self.coordinator.data["device_statistics"]
         if self.mac_address not in device_stats:
             return None
@@ -559,7 +557,7 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         mapping = SENSOR_VALUE_MAPPING.get(key)
         if not mapping:
             return None
-        
+
         # Check if any required keys exist in data
         if not _has_required_data(device_data, mapping.data_keys):
             return mapping.default_value
@@ -579,7 +577,7 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         """Return the state attributes."""
         if not self.coordinator.data or "device_statistics" not in self.coordinator.data:
             return {}
-            
+
         device_stats = self.coordinator.data["device_statistics"]
         if self.mac_address not in device_stats:
             return {}
@@ -589,7 +587,8 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         attributes = {
             "mac_address": self.mac_address,
             "router_host": self._host,
-            "last_update": self.coordinator.last_update_success,
+            "last_update_success": self.coordinator.last_update_success,
+            "ap_device": device_data.get("ap_device", "Unknown AP"),
         }
 
         # Add extra attributes using mapping

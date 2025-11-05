@@ -1,9 +1,11 @@
 """Extended Ubus client with specific OpenWrt functionality."""
 
-import json
 import logging
+from enum import Enum
+from typing import cast, Any
 
 from .Ubus import Ubus
+from .Ubus.interface import RPC, RPCResponseResult, RPCResponse
 from .const import (
     API_RPC_CALL,
     API_RPC_LIST,
@@ -35,113 +37,238 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+class SystemInfo:
+    pass
+
+
+class BoardInfo:
+    pass
+
+
+class QModemInfo:
+    pass
+
+
+class DeviceStatistics:
+    pass
+
+
+class AccessPointsInfo:
+    pass
+
+
+class ServiceStatus(RPCResponseResult):
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ServiceStatus":
+        return ServiceStatus()
+
+
+class SystemTemperatures:
+    pass
+
+
+class FileReadResult(RPCResponseResult):
+    def __init__(self, data: str):
+        self.data = data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FileReadResult":
+        return FileReadResult(data["data"])
+
+
+class DirectoryEntryType(Enum):
+    FILE = "file"
+    DIRECTORY = "directory"
+    UNKNOWN = "unknown"
+
+
+class DirectoryEntry:
+    def __init__(self, name: str, file_type: DirectoryEntryType):
+        self.name = name
+        self.file_type = file_type
+
+
+class DirectoryListResult(RPCResponseResult):
+    def __init__(self, entries: list[DirectoryEntry]):
+        self.entries = entries
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DirectoryListResult":
+        files: list[DirectoryEntry] = []
+        for file in data.get("entries", []):
+            file_name = file["name"]
+            file_type = DirectoryEntryType(file["type"]) if "type" in file else DirectoryEntryType.UNKNOWN
+            files.append(DirectoryEntry(file_name, file_type))
+        return DirectoryListResult(files)
+
+
+class IPV4Lease:
+    def __init__(self, ip: str, hostname: str):
+        self.ip = ip
+        self.hostname = hostname
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "IPV4Lease":
+        return IPV4Lease(
+            ip=data["ip"],
+            hostname=data["hostname"],
+        )
+
+
+class IPV4LeasesResult(RPCResponseResult):
+    def __init__(self, leases: dict[str, IPV4Lease]):
+        self.leases = leases
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "IPV4LeasesResult":
+        leases: dict[str, IPV4Lease] = {}
+        if devices := data["device"]:
+            for device in devices.values():
+                for lease in device.get("leases", []):
+                    if "mac" in lease and "ip" in lease and "hostname" in lease:
+                        mac = data["mac"]
+                        # Convert aabbccddeeff to aa:bb:cc:dd:ee:ff
+                        if len(mac) == 12:
+                            mac = ":".join(mac[i:i + 2] for i in range(0, len(mac), 2))
+                            mac = mac.upper()
+                        leases[mac] = IPV4Lease.from_dict(lease)
+
+        return IPV4LeasesResult(leases=leases)
+
+
+class DHCPConfigLeaseFilesResult(RPCResponseResult):
+    def __init__(self, paths: list[str]):
+        self.paths = paths
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DHCPConfigLeaseFilesResult":
+        return DHCPConfigLeaseFilesResult(
+            paths=[cfg.get("leasefile", "/tmp/dhcp.leases") for cfg in data.get("values", {})]
+        )
+
+
+class ListHostapdResult(RPCResponseResult):
+    def __init__(self, hostapd_instances: list[str]):
+        self.hostapd_instances = hostapd_instances
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ListHostapdResult":
+        return ListHostapdResult(
+            hostapd_instances=list(data.keys())
+        )
+
+
+class RCListServicesResponse(RPCResponseResult):
+    def __init__(self, services: list[str]):
+        self.services = services
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RCListServicesResponse":
+        return RCListServicesResponse(
+            services=list(data.keys())
+        )
+
+
 class ExtendedUbus(Ubus):
     """Extended Ubus client with specific OpenWrt functionality."""
 
-    async def file_read(self, path):
+    async def file_read(self, path) -> str | None:
         """Read file content."""
-        return await self.api_call(
+        result = await self.api_call(
+            FileReadResult,
             API_RPC_CALL,
             API_SUBSYS_FILE,
             API_METHOD_READ,
             {API_PARAM_PATH: path},
         )
-        
-    async def get_conntrack_count(self):
+        if result:
+            return result.data
+        return None
+
+    async def get_conntrack_count(self) -> int | None:
         """Read connection tracking count from /proc/sys/net/netfilter/nf_conntrack_count."""
-        try:
-            result = await self.file_read("/proc/sys/net/netfilter/nf_conntrack_count")
-            if result and "data" in result:
-                # Convert the data to an integer
-                return int(result["data"].strip())
-            return None
-        except Exception as exc:
-            _LOGGER.debug("Error reading connection tracking count: %s", exc)
-            return None
-            
-    async def get_system_temperatures(self):
+        if result := await self.file_read("/proc/sys/net/netfilter/nf_conntrack_count"):
+            # Convert the data to an integer
+            return int(result)
+        return None
+
+    async def get_system_temperatures(self) -> dict[str, float] | None:
         """Read system temperature sensors from /sys/class/hwmon/*/temp1_input."""
-        try:
-            # First, list all hwmon directories
-            hwmon_list_result = await self.api_call(
-                API_RPC_CALL,
-                API_SUBSYS_FILE,
-                "list",
-                {"path": "/sys/class/hwmon/"},
-            )
-            
-            if not hwmon_list_result or "entries" not in hwmon_list_result:
-                _LOGGER.debug("No hwmon directories found")
-                return {}
-                
-            temperatures = {}
-            
-            # Process each hwmon directory
-            for entry in hwmon_list_result["entries"]:
-                if entry["type"] != "directory":
-                    continue
-                    
-                hwmon_dir = entry["name"]
-                hwmon_path = f"/sys/class/hwmon/{hwmon_dir}"
-                
-                # Try to read the name file
-                try:
-                    name_result = await self.file_read(f"{hwmon_path}/name")
-                    if name_result and "data" in name_result:
-                        sensor_name = name_result["data"].strip()
-                        
-                        # Try to read the temperature file
-                        temp_result = await self.file_read(f"{hwmon_path}/temp1_input")
-                        if temp_result and "data" in temp_result:
-                            try:
-                                # Convert millidegrees to degrees
-                                temp_value = int(temp_result["data"].strip()) / 1000.0
-                                temperatures[sensor_name] = temp_value
-                            except (ValueError, TypeError) as exc:
-                                _LOGGER.debug("Error converting temperature value: %s", exc)
-                except Exception as exc:
-                    _LOGGER.debug("Error reading temperature for %s: %s", hwmon_dir, exc)
-            
-            return temperatures
-        except Exception as exc:
-            _LOGGER.debug("Error reading system temperatures: %s", exc)
+        # First, list all hwmon directories
+        hwmon_list_result = await self.api_call(
+            DirectoryListResult,
+            API_RPC_CALL,
+            API_SUBSYS_FILE,
+            "list",
+            {"path": "/sys/class/hwmon/"},
+        )
+
+        if not hwmon_list_result:
+            _LOGGER.debug("No hwmon directories found")
             return {}
-            
-    async def get_dhcp_clients_count(self):
-        """Read DHCP leases file and count non-empty lines to determine client count."""
-        try:
-            result = await self.file_read("/tmp/dhcp.leases")
-            if result and "data" in result:
-                # Count non-empty lines
-                lines = result["data"].splitlines()
-                client_count = sum(1 for line in lines if line.strip())
-                return client_count
-            return 0
-        except Exception as exc:
-            _LOGGER.debug("Error reading DHCP leases file: %s", exc)
-            return 0
 
-    async def get_dhcp_method(self, method):
+        temperatures: dict[str, float] = {}
+
+        # Process each hwmon directory
+        for entry in hwmon_list_result.entries:
+            if entry.file_type != DirectoryEntryType.DIRECTORY:
+                continue
+
+            hwmon_path = f"/sys/class/hwmon/{entry.name}"
+
+            if hwmon_name := await self.file_read(f"{hwmon_path}/name"):
+                # Try to read the temperature file
+                if hwmon_temperature := await self.file_read(f"{hwmon_path}/temp1_input"):
+                    try:
+                        # Convert millidegrees to degrees
+                        temperatures[hwmon_name.strip()] = int(hwmon_temperature) / 1000.0
+                    except (ValueError, TypeError) as exc:
+                        _LOGGER.debug("Error converting temperature value: %s", exc)
+
+        return temperatures
+
+    async def get_ipv4leases(self, dhcp_software: str) -> dict[str, IPV4Lease] | None:
         """Get DHCP method."""
-        return await self.api_call(API_RPC_CALL, API_SUBSYS_DHCP, method)
+        if dhcp_software == "dnsmasq":
+            # Get dnsmasq lease file location
+            if result := await self.get_dhcp_config_lease_files():
+                leases: dict[str, IPV4Lease] = {}
+                for leasefile in result.paths:
+                    # Read lease file
+                    if leasefile_contents := await self.file_read(leasefile):
+                        for line in leasefile_contents.splitlines():
+                            hosts = line.split(" ")
+                            if len(hosts) >= 4:
+                                leases[hosts[1].upper()] = IPV4Lease(ip=hosts[2], hostname=hosts[3])
+                return leases
+        elif dhcp_software == "odhcpd":
+            # Get odhcpd leases
+            if ipv4leases := await self.api_call(IPV4LeasesResult, API_RPC_CALL, API_SUBSYS_DHCP, "ipv4leases"):
+                return ipv4leases.leases
+        return None
 
-    async def get_hostapd(self):
+    async def get_hostapds(self) -> list[str] | None:
         """Get hostapd data."""
-        return await self.api_call(API_RPC_LIST, API_SUBSYS_HOSTAPD)
+        if result := await self.api_call(ListHostapdResult, API_RPC_LIST, API_SUBSYS_HOSTAPD):
+            return result.hostapd_instances
+        return None
 
-    async def get_hostapd_clients(self, hostapd):
+    async def get_hostapd_clients(self, hostapd: str):
         """Get hostapd clients."""
-        return await self.api_call(API_RPC_CALL, hostapd, API_METHOD_GET_CLIENTS)
+        if result := await self.api_call(HostapdInfoResult, API_RPC_CALL, hostapd, API_METHOD_GET_CLIENTS):
+            return result
+        return None
 
-    async def get_uci_config(self, _config, _type):
-        """Get UCI config."""
+    async def get_dhcp_config_lease_files(self):
+        """Get DHCP lease file configuration."""
         return await self.api_call(
+            DHCPConfigLeaseFilesResult,
             API_RPC_CALL,
             API_SUBSYS_UCI,
             API_METHOD_GET,
             {
-                API_PARAM_CONFIG: _config,
-                API_PARAM_TYPE: _type,
+                API_PARAM_CONFIG: "dhcp",
+                API_PARAM_TYPE: "dnsmasq",
             },
         )
 
@@ -157,11 +284,11 @@ class ExtendedUbus(Ubus):
         """Get system method."""
         return await self.api_call(API_RPC_CALL, API_SUBSYS_SYSTEM, method)
 
-    async def system_board(self):
+    async def system_board(self) -> BoardInfo:
         """System board."""
         return await self.get_system_method(API_METHOD_BOARD)
 
-    async def system_info(self):
+    async def system_info(self) -> SystemInfo:
         """System info."""
         return await self.get_system_method(API_METHOD_INFO)
 
@@ -240,7 +367,7 @@ class ExtendedUbus(Ubus):
         else:
             _LOGGER.warning("Unexpected result type in parse_sta_statistics: %s", type(result).__name__)
             return sta_statistics
-        
+
         # iwinfo format - each device has detailed statistics
         for device in devices_list:
             if isinstance(device, dict) and "mac" in device:
@@ -248,7 +375,7 @@ class ExtendedUbus(Ubus):
                 sta_statistics[mac] = device
             else:
                 _LOGGER.debug("Invalid device format: %s", device)
-        
+
         return sta_statistics
 
     def parse_ap_devices(self, result):
@@ -259,11 +386,11 @@ class ExtendedUbus(Ubus):
         """Parse access point information from the ubus result."""
         if not result:
             return {}
-        
+
         # The result should contain the AP information directly
         ap_info = dict(result)
         ap_info["device"] = ap_device  # Add device name for identification
-        
+
         # Set device name based on SSID and mode
         if "ssid" in ap_info and "mode" in ap_info:
             ssid = ap_info["ssid"]
@@ -271,7 +398,7 @@ class ExtendedUbus(Ubus):
             ap_info["device_name"] = f"{ssid}({mode})"
         else:
             ap_info["device_name"] = ap_device
-            
+
         return ap_info
 
     # hostapd specific methods
@@ -307,33 +434,33 @@ class ExtendedUbus(Ubus):
         """Get station data for all AP devices using batch call."""
         if not ap_devices:
             return {}
-        
+
         # Build API calls for all AP devices
         rpcs = []
         for i, ap_device in enumerate(ap_devices):
             if is_hostapd:
                 # For hostapd, ap_device is the hostapd interface name
-                api_call = json.loads(self.build_api(
+                api_call = self.build_api(
                     API_RPC_CALL,
                     ap_device,
                     API_METHOD_GET_CLIENTS
-                ))
+                )
             else:
                 # For iwinfo, ap_device is the wireless interface name
-                api_call = json.loads(self.build_api(
+                api_call = self.build_api(
                     API_RPC_CALL,
                     API_SUBSYS_IWINFO,
                     API_METHOD_GET_STA,
                     {"device": ap_device}
-                ))
+                )
             api_call["id"] = i  # Use index as ID to match responses
             rpcs.append(api_call)
-        
+
         # Execute batch call
         results = await self.batch_call(rpcs)
         if not results:
             return {}
-        
+
         # Process results
         sta_data = {}
 
@@ -384,24 +511,24 @@ class ExtendedUbus(Ubus):
         """Get AP info for all AP devices using batch call."""
         if not ap_devices:
             return {}
-        
+
         # Build API calls for all AP devices
         rpcs = []
         for i, ap_device in enumerate(ap_devices):
-            api_call = json.loads(self.build_api(
+            api_call = self.build_api(
                 API_RPC_CALL,
                 API_SUBSYS_IWINFO,
                 API_METHOD_INFO,
                 {"device": ap_device}
-            ))
+            )
             api_call["id"] = i  # Use index as ID to match responses
             rpcs.append(api_call)
-        
+
         # Execute batch call
         results = await self.batch_call(rpcs)
         if not results:
             return {}
-        
+
         # Process results
         ap_info_data = {}
         for i, result in enumerate(results):
@@ -416,7 +543,7 @@ class ExtendedUbus(Ubus):
                         continue
                     else:
                         continue
-                        
+
                     if ap_result:
                         ap_info = self.parse_ap_info(ap_result, ap_device)
                         # Only add AP if it has an SSID
@@ -427,7 +554,7 @@ class ExtendedUbus(Ubus):
                             _LOGGER.debug("Skipping AP device %s - no SSID found", ap_device)
                 except (IndexError, KeyError) as exc:
                     _LOGGER.debug("Error parsing AP info for %s: %s", ap_device, exc)
-        
+
         return ap_info_data
 
     # RC (service control) specific methods
@@ -436,53 +563,49 @@ class ExtendedUbus(Ubus):
         if not include_status:
             # Just get service list
             return await self.api_call(API_RPC_CALL, API_SUBSYS_RC, API_METHOD_LIST)
-        
+
         # Get service list first
         service_list_result = await self.api_call(API_RPC_CALL, API_SUBSYS_RC, API_METHOD_LIST)
         if not service_list_result:
             _LOGGER.warning("Failed to get service list from RC")
             return {}
-        
+
         _LOGGER.debug("Got service list: %s", service_list_result)
-        
+
         # Build batch calls for each service status
         services_with_status = {}
-        status_rpcs = []
+        status_rpcs: list[RPC[ServiceStatus]] = []
         service_names = []
-        
-        for service_name in service_list_result:
+
+        for _, service_name in enumerate(service_list_result):
             service_names.append(service_name)
             # Use "list" method with service name to get specific service status
-            status_call = json.loads(self.build_api(
-                API_RPC_CALL,
-                API_SUBSYS_RC,
-                API_METHOD_LIST,
-                {"name": service_name}
-            ))
+            status_call = RPC(ServiceStatus, API_RPC_CALL, API_SUBSYS_RC, API_METHOD_LIST, {"name": service_name})
             status_rpcs.append(status_call)
-        
+
         # Execute batch call for all service statuses
         if status_rpcs:
             _LOGGER.debug("Executing batch call for %d services", len(status_rpcs))
             status_results = await self.batch_call(status_rpcs)
-            
+
             if status_results:
                 _LOGGER.debug("Got %d status results", len(status_results))
                 for i, result in enumerate(status_results):
+                    result = cast(RPCResponse[ServiceStatus] | None, result)
                     if i < len(service_names):
                         service_name = service_names[i]
                         _LOGGER.debug("Processing result %d for service %s: %s", i, service_name, result)
-                        
-                        if result and "result" in result and len(result["result"]) > 1:
+
+                        if result and result.result:
                             # Service status format: [session_id, services_dict]
                             services_dict = result["result"][1] if len(result["result"]) > 1 else {}
                             _LOGGER.debug("Raw services dict for %s: %s", service_name, services_dict)
-                            
+
                             # Extract the specific service from the services dict
                             if isinstance(services_dict, dict) and service_name in services_dict:
                                 service_status = services_dict[service_name]
                                 _LOGGER.debug("Extracted service status for %s: %s", service_name, service_status)
-                                
+
                                 # Parse service status - OpenWrt RC returns different formats
                                 parsed_status = self._parse_service_status(service_status, service_name)
                                 services_with_status[service_name] = parsed_status
@@ -495,31 +618,31 @@ class ExtendedUbus(Ubus):
                             services_with_status[service_name] = {"running": False, "enabled": False}
             else:
                 _LOGGER.warning("Batch call returned no results")
-        
+
         _LOGGER.debug("Final services with status: %s", services_with_status)
         return services_with_status
-    
+
     def _parse_service_status(self, status_data, service_name):
         """Parse service status from RC API response."""
         _LOGGER.debug("Parsing service status for %s: %s (type: %s)", service_name, status_data, type(status_data))
-        
+
         if not status_data:
             _LOGGER.debug("Service %s: No status data, returning disabled", service_name)
             return {"running": False, "enabled": False}
-        
+
         # OpenWrt RC list returns a dict with service properties:
         # {"start": 99, "enabled": true, "running": false}
         if isinstance(status_data, dict):
             _LOGGER.debug("Service %s: Dict status keys=%s", service_name, list(status_data.keys()))
-            
+
             # Extract running and enabled status
             running = status_data.get("running", False)
             enabled = status_data.get("enabled", False)
             start_priority = status_data.get("start", 0)
-            
-            _LOGGER.debug("Service %s: running=%s, enabled=%s, start=%s", 
-                         service_name, running, enabled, start_priority)
-            
+
+            _LOGGER.debug("Service %s: running=%s, enabled=%s, start=%s",
+                          service_name, running, enabled, start_priority)
+
             result = {
                 "running": bool(running),
                 "enabled": bool(enabled),
@@ -528,49 +651,50 @@ class ExtendedUbus(Ubus):
             }
             _LOGGER.debug("Service %s: Final parsed result=%s", service_name, result)
             return result
-        
+
         # Fallback for string or other formats (shouldn't happen with RC list)
         if isinstance(status_data, str):
             running = status_data.lower() in ["running", "active", "started"]
             _LOGGER.debug("Service %s: String status '%s', running=%s", service_name, status_data, running)
             return {"running": running, "enabled": running, "status": status_data}
-        
+
         # Fallback for unexpected formats
-        _LOGGER.warning("Service %s: Unexpected status format (type %s): %s", service_name, type(status_data), status_data)
+        _LOGGER.warning("Service %s: Unexpected status format (type %s): %s", service_name, type(status_data),
+                        status_data)
         return {"running": False, "enabled": False, "raw_status": status_data}
 
     async def service_action(self, service_name, action):
         """Perform action on a service (start, stop, restart)."""
         return await self.api_call(
-            API_RPC_CALL, 
-            API_SUBSYS_RC, 
-            API_METHOD_INIT, 
+            API_RPC_CALL,
+            API_SUBSYS_RC,
+            API_METHOD_INIT,
             {"name": service_name, "action": action}
         )
-      
+
     async def check_hostapd_available(self):
         """Check if hostapd service is available via ubus list."""
         try:
             result = await self.api_call(API_RPC_LIST, "*")
             if not result:
                 return False
-            
+
             # Look for any hostapd.* interfaces in the result
             for interface_name in result.keys():
                 if interface_name.startswith("hostapd."):
                     _LOGGER.debug("Found hostapd interface: %s", interface_name)
                     return True
-            
+
             _LOGGER.debug("No hostapd interfaces found in ubus list")
             return False
-            
+
         except Exception as exc:
             _LOGGER.warning("Failed to check hostapd availability: %s", exc)
             return False
 
-    async def kick_device(self, hostapd_interface, mac_address, ban_time=60000, reason=5):
+    async def kick_device(self, hostapd_interface: str, mac_address: str, ban_time: int = 60000, reason: int = 5):
         """Kick a device from the AP interface.
-        
+
         Args:
             hostapd_interface: The hostapd interface name (e.g. "hostapd.phy0-ap0")
             mac_address: MAC address of the device to kick

@@ -31,15 +31,15 @@
           "selected_services": "Services to Control"
         }
       },
-      "timeouts": {
-        "title": "Timeout Configuration",
+      "intervals": {
+        "title": "Interval Configuration",
         "description": "Configure update intervals for {host}",
         "data": {
-          "system_sensor_timeout": "System Sensor Update Interval (seconds)",
-          "qmodem_sensor_timeout": "QModem Sensor Update Interval (seconds)",
-          "sta_sensor_timeout": "Station Device Sensor Update Interval (seconds)",
-          "ap_sensor_timeout": "Access Point Sensor Update Interval (seconds)",
-          "service_timeout": "Service Status Update Interval (seconds)"
+          "system_sensor_interval": "System Sensor Update Interval (seconds)",
+          "qmodem_sensor_interval": "QModem Sensor Update Interval (seconds)",
+          "sta_sensor_interval": "Station Device Sensor Update Interval (seconds)",
+          "ap_sensor_interval": "Access Point Sensor Update Interval (seconds)",
+          "service_interval": "Service Status Update Interval (seconds)"
         }
       }
     },
@@ -58,10 +58,10 @@
     "step": {
       "init": {
         "title": "Configure OpenWrt ubus Integration",
-        "description": "Configure sensor types, timeouts, and other options for your OpenWrt device",
+        "description": "Configure sensor types, intervals, and other options for your OpenWrt device",
         "data": {
           "wireless_software": "Wireless Software",
-          "dhcp_software": "DHCP Software", 
+          "dhcp_software": "DHCP Software",
           "enable_system_sensors": "Enable System Sensors",
           "enable_qmodem_sensors": "Enable QModem Sensors",
           "enable_sta_sensors": "Enable Station Device Sensors",
@@ -69,10 +69,10 @@
           "enable_service_controls": "Enable Service Controls",
           "selected_services": "Services to Control",
           "refresh_services": "Refresh Services List",
-          "system_sensor_timeout": "System Sensor Update Interval (seconds)",
-          "qmodem_sensor_timeout": "QModem Sensor Update Interval (seconds)",
-          "sta_sensor_timeout": "Station Device Sensor Update Interval (seconds)",
-          "ap_sensor_timeout": "Access Point Sensor Update Interval (seconds)"
+          "system_sensor_interval": "System Sensor Update Interval (seconds)",
+          "qmodem_sensor_interval": "QModem Sensor Update Interval (seconds)",
+          "sta_sensor_interval": "Station Device Sensor Update Interval (seconds)",
+          "ap_sensor_interval": "Access Point Sensor Update Interval (seconds)"
         },
         "data_description": {
           "wireless_software": "Software used to get wireless information (iwinfo or hostapd)",
@@ -81,10 +81,10 @@
           "enable_qmodem_sensors": "Monitor cellular modem information (if available)",
           "enable_sta_sensors": "Monitor connected WiFi devices and their statistics",
           "enable_ap_sensors": "Monitor access point interface information (WiFi network details)",
-          "system_sensor_timeout": "How often to update system sensor data (10-300 seconds)",
-          "qmodem_sensor_timeout": "How often to update modem sensor data (30-600 seconds)",
-          "sta_sensor_timeout": "How often to update station device data (10-300 seconds)",
-          "ap_sensor_timeout": "How often to update access point data (30-600 seconds)"
+          "system_sensor_interval": "How often to update system sensor data (10-300 seconds)",
+          "qmodem_sensor_interval": "How often to update modem sensor data (30-600 seconds)",
+          "sta_sensor_interval": "How often to update station device data (10-300 seconds)",
+          "ap_sensor_interval": "How often to update access point data (30-600 seconds)"
         }
       }
     }

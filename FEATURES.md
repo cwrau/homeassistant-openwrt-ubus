@@ -6,12 +6,12 @@
 - **🔄 Switch Entities**: Real-time service start/stop control
 - **⚡ Button Entities**: Quick service actions (start, stop, enable, disable, restart)
 - **📊 Batch API Optimization**: Efficient service status polling
-- **⚙️ Configurable Timeouts**: Customizable service operation timeouts
+- **⚙️ Configurable Intervals**: Customizable service operation intervals
 
 ### Performance Optimizations
 - **📡 Shared Data Manager**: Centralized data fetching with intelligent caching
 - **🚀 Batch API Calls**: Reduced router load through grouped requests
-- **⏱️ Smart Timeouts**: Per-component timeout configuration
+- **⏱️ Smart Intervals**: Per-component interval configuration
 - **🔄 Auto-Reconnection**: Automatic connection recovery with retry logic
 
 ## 📋 Complete Feature Matrix
@@ -54,13 +54,13 @@
 
 ### Data Management
 - **Shared Coordinator**: Single data source for all platforms
-- **Smart Caching**: Configurable cache timeouts per data type
+- **Smart Caching**: Configurable cache intervals per data type
 - **Batch Requests**: Multiple API calls in single HTTP request
 - **Error Recovery**: Automatic retry with exponential backoff
 
 ### Network Optimization  
 - **Connection Pooling**: Reuse HTTP connections
-- **Timeout Control**: Per-operation timeout configuration
+- **Interval Control**: Per-operation interval configuration
 - **Load Balancing**: Distribute requests across time
 - **Status Batching**: Group service status checks
 
@@ -68,9 +68,9 @@
 
 | Setting | Default | Range | Purpose |
 |---------|---------|-------|---------|
-| System Sensor Timeout | 30s | 5-300s | System info fetch timeout |
-| QModem Sensor Timeout | 30s | 5-300s | Modem data fetch timeout |
-| Service Timeout | 30s | 5-300s | Service control timeout |
+| System Sensor Interval | 30s | 5-300s | System info fetch interval |
+| QModem Sensor Interval | 30s | 5-300s | Modem data fetch interval |
+| Service Interval | 30s | 5-300s | Service control interval |
 | Scan Interval | Variable | - | Platform-specific update rates |
 
 ## 🔧 Technical Architecture
@@ -103,7 +103,7 @@ SharedDataUpdateCoordinator
 - ✅ Implemented batch API optimization
 - ✅ Fixed data format consistency issues
 - ✅ Enhanced error handling and recovery
-- ✅ Added configurable timeout settings
+- ✅ Added configurable interval settings
 - ✅ Improved translation support
 
 ### Bug Fixes

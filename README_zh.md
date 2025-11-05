@@ -510,7 +510,7 @@ custom_components/openwrt_ubus/
 - ✅ 确认用户名和密码凭据有效
 - ✅ 确保 `rpcd` 和 `uhttpd` 服务正在运行：`service rpcd status && service uhttpd status`
 - ✅ 检查防火墙设置是否允许 HTTP 访问 ubus（端口 80/443）
-- ✅ 测试连接性：`curl http://router_ip/ubus -d '{"jsonrpc":"2.0","method":"call","params":["00000000000000000000000000000000","session","login",{"username":"root","password":"your_password"}],"id":1}'`
+- ✅ 测试连接性：`curl https://router_ip/ubus -d '{"jsonrpc":"2.0","method":"call","params":["00000000000000000000000000000000","session","login",{"username":"root","password":"your_password"}],"id":1}'`
 
 **❌ 未检测到设备**
 - ✅ 验证无线软件设置与您的 OpenWrt 配置匹配
@@ -556,7 +556,7 @@ logger:
 ```
 
 **日志分析技巧：**
-- **连接问题**：查找 "Failed to connect" 或 "Timeout" 消息
+- **连接问题**：查找 "Failed to connect" 或 "Interval" 消息
 - **认证问题**：搜索 "401" 或 "authentication failed" 错误
 - **设备检测**：检查 "No devices found" 或解析错误
 - **服务控制**：监控 "Service operation failed" 消息
